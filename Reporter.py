@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import time, json, subprocess, urllib, hmac, hashlib, http
+import time, json, subprocess, urllib, hmac, hashlib, http, traceback, os
 import paho.mqtt.client as mqtt
 
 # store checkups to post as one block of checkups
@@ -9,23 +9,47 @@ version = 2020
 secret_path = "/home/brandon/haldor/.open-sesame"
 secret = ''
 
-topics = ["topic/haldor/event", "topic/haldor/checkup", "topic/haldor/bootup"]
+data_sources = ['haldor']
+checkups = {}
+
+subtopics = ["event", "checkup", "bootup"]
+
+topics = []
+
+boot_check_list = {
+    'uptime':["uptime"],
+    'uname':["uname", "-a"],
+    'ifconfig_eth0':["/sbin/ifconfig", "eth0"],
+    'my_ip':["/usr/bin/curl", "-s", "http://whatismyip.akamai.com/"],
+    'local_ip':["/home/brandon/haldor/local_ip.sh"]
+}
+
 def on_log(client, userdata, level, buff):
-    print(buff)
+    if level != mqtt.MQTT_LOG_DEBUG:
+        print (level)
+        print(buff)
+    if level == mqtt.MQTT_LOG_ERR:
+        print ("error handler")
+        traceback.print_exc()
+        os._exit(1)
 
 def on_connect(client, userdata, flags, rc):
+    global topics
     print("MQTT Connected: " + str(rc))
-    for topic in topics:
-        client.subscribe(topic)
-        print ("Subscribed to " + topic)
+    for data_source in data_sources:
+        for subtopic in subtopics:
+            topic = data_source + '/' + subtopic
+            topics += topic
+            client.subscribe(topic)
+            print ("Subscribed to " + topic)
 
 def on_message(client, userdata, msg):
     print("Message received: " + msg.topic)
-    if msg.topic == "topic/haldor/checkup":
-        print(msg.payload.decode())
-        resp = notify('checkup', json.loads(msg.payload.decode()))
-        print ("Response: " + resp.read().decode('utf-8'))
-        return
+    for source in data_sources:
+        if msg.topic == source + '/' + "checkup":
+            print(msg.payload.decode())
+            checkups[source] = json.loads(msg.payload.decode())
+            return
     if msg.topic in topics:
         print(msg.topic + ":" + msg.payload.decode())
         return
@@ -69,31 +93,13 @@ def notify_bootup():
     boot_checks = {}
 
     print("Bootup:")
-    
-    try:
-        boot_checks['uptime'] = subprocess.check_output("uptime")
-        boot_checks['uname'] = subprocess.check_output(["uname", "-a"])
-    except:
-        print("\tuptime/uname read error")
-    
-    try:
-        boot_checks['ifconfig_eth0'] = subprocess.check_output(["/sbin/ifconfig", "eth0"])
-    except:
-        print("\teth0 read error")
-    
-    try:
-        boot_checks['my_ip'] = subprocess.check_output(["/usr/bin/curl", "-s", "http://whatismyip.akamai.com/"])
-    except:
-        print("\tmy ip read error")
-    
-    try:
-        boot_checks['local_ip'] = subprocess.check_output(["/home/brandon/haldor/local_ip.sh"])
-    except:
-        print("\tlocal ip read error")
+   
+    for bc_name, bc_cmd in boot_check_list.items():
+        boot_checks[bc_name] = subprocess.check_output(bc_cmd)
 
     resp = notify('bootup', boot_checks)
     session = resp.read()
-    print("Bootup Complete: {0}".format(session))
+    print("Bootup Complete: {0}".format(session.decode('utf-8')))
 
 client = mqtt.Client()
 client.on_connect = on_connect
@@ -106,7 +112,14 @@ client.loop_start()
 notify_bootup()
 
 while True:
-    time.sleep(3)
-    print("Notify Requested.")
     checkups = {}
-    client.publish("topic/checkup_req")
+    client.publish("reporter/checkup_req")
+    print("Notify Requested.")
+    time.sleep(10)
+    notify_checkup = {}
+    for checkup in checkups.values():
+        print (checkup)
+        notify_checkup.update(checkup)
+    resp = notify('checkup', notify_checkup)
+    print ("Response: " + resp.read().decode('utf-8'))
+    time.sleep(30)
