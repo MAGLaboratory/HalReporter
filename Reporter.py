@@ -10,7 +10,6 @@ secret_path = "/home/brandon/haldor/.open-sesame"
 secret = ''
 
 data_sources = ['haldor']
-checkups = {}
 
 subtopics = ["event", "checkup", "bootup"]
 
@@ -47,7 +46,6 @@ def on_message(client, userdata, msg):
     print("Message received: " + msg.topic)
     for source in data_sources:
         if msg.topic == source + '/' + "checkup":
-            print(msg.payload.decode())
             checkups[source] = json.loads(msg.payload.decode())
             return
     if msg.topic in topics:
