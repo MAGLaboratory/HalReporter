@@ -9,5 +9,7 @@
 		"ifconfig_eth0": ["/sbin/ifconfig eth0"],
 		"my_ip": ["/usr/bin/curl -s http://whatismyip.akamai.com/"],
 		"local_ip": ["/sbin/ifconfig eth0 | grep inet | awk '{ print $2 }' | cut -d: -f2 | tr -d '\\n'"]
-	}
+	},
+	"mqtt_broker": "daisy",
+	"mqtt_port": 1883
 }

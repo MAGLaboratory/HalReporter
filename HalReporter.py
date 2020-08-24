@@ -27,6 +27,8 @@ class HR(mqtt.Client):
         data_sources: List[str]
         subtopics: List[str]
         boot_check_list: Dict[str, List[str]]
+        mqtt_broker: str
+        mqtt_port: int
 
     checkups = {}
     session = ''.encode('utf-8')
@@ -107,7 +109,7 @@ class HR(mqtt.Client):
         print("Bootup Complete: {0}".format(self.session.decode('utf-8')))
 
     def run(self):
-        self.connect("daisy")
+        self.connect(self.data.mqtt_broker, self.data.mqtt_port, 60)
         
         self.loop_start()
         
