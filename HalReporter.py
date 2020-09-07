@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import time, json, subprocess, urllib, hmac, hashlib, http, traceback, os
+import time, json, signal, subprocess, urllib, hmac, hashlib, http, traceback, os
 import paho.mqtt.client as mqtt
 from daemon import Daemon
 from dataclasses import dataclass
@@ -131,11 +131,19 @@ class HR(mqtt.Client):
         self.session = resp.read()
         print("Bootup Complete: {0}".format(self.session.decode('utf-8')))
 
+    def signal_handler(self, signum, frame):
+        print("Caught a deadly signal!")
+        self.running = False
+
     def run(self):
         if (self.data.checkup_freq < 10):
             print("Checkup period too low")
             sys.exit(1)
         self.checkup_wait = self.data.checkup_freq - 10
+
+        signal.signal(signal.SIGINT, self.signal_handler)
+        signal.signal(signal.SIGTERM, self.signal_handler)
+        self.running = True
 
         self.connect(self.data.mqtt_broker, self.data.mqtt_port, 60)
         self.loop_start()
@@ -143,7 +151,7 @@ class HR(mqtt.Client):
         time.sleep(60)
         self.notify_bootup()
         
-        while True:
+        while self.running:
             self.checkups = {}
             self.notify_checkup = {}
             self.publish("reporter/checkup_req")
@@ -165,3 +173,5 @@ class HR(mqtt.Client):
             resp = self.notify('checkup', self.notify_checkup)
             print ("Response: " + resp.read().decode('utf-8'))
             time.sleep(self.checkup_wait)
+
+        self.loop_stop()
