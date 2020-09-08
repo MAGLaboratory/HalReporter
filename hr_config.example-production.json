@@ -1,0 +1,22 @@
+{
+	"pidfile": "/tmp/HalReport.pid",
+	"secret": "",
+	"data_sources": ["haldor", "daisy"],
+	"subtopics": ["event", "checkup", "bootup"],
+	"boot_check_list": {
+		"Reporter CPU Temp": ["cat /sys/class/thermal/thermal_zone0/temp | tr -d '\\n'"],
+		"Reporter Uptime": ["uptime"],
+		"Reporter Local IP": ["/sbin/ifconfig eth0 | grep inet | awk '{ print $2 }' | cut -d: -f2 | tr -d '\\n'"],
+		"Reporter Disk Usage": ["df -h | grep -v tmpfs | tail -n +2"],
+		"Reporter Memory Usage": ["free -h"],
+		"Reporter uname": ["uname -a"],
+		"Reporter ifconfig_eth0": ["/sbin/ifconfig eth0"],
+		"Reporter my_ip": ["/usr/bin/curl -s http://whatismyip.akamai.com/"]
+	},
+	"checkup_freq": 300,
+	"long_checkup_freq": 100,
+	"long_checkup_leng": 5,
+	"mqtt_broker": "hal",
+	"mqtt_port": 1883,
+	"mqtt_timeout": 60
+}

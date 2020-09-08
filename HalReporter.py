@@ -23,15 +23,18 @@ class HR(mqtt.Client):
     @dataclass
     class data:
         pidfile: str
-        secret_path: str
+        secret: str
         data_sources: List[str]
         subtopics: List[str]
         boot_check_list: Dict[str, List[str]]
+        http_server: str
+        http_timeout: int
+        checkup_freq: int
         long_checkup_freq: int
         long_checkup_leng: int
         mqtt_broker: str
         mqtt_port: int
-        checkup_freq: int
+        mqtt_timeout: int
 
     checkups = {}
     notify_checkup = {}
@@ -86,17 +89,8 @@ class HR(mqtt.Client):
             print(msg.payload.decode('utf-8'))
             return
     
-    def get_secret(self):
-        if len(self.secret) <= 0:
-            my_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), self.data.secret_path))
-            file = open(my_path, 'rb')
-            self.secret = file.read()
-            file.close
-      
-        return self.secret
-    
     def notify_hash(self, body):
-        hasher = hmac.new(self.get_secret(), body, hashlib.sha256)
+        hasher = hmac.new(self.data.secret.encode('ascii'), body, hashlib.sha256)
         hasher.update(self.session)
         return hasher.hexdigest()
     
@@ -113,7 +107,7 @@ class HR(mqtt.Client):
             "X-Checksum": self.notify_hash(body)
             }
     
-        conn = http.client.HTTPConnection("frank", None, timeout=60)
+        conn = http.client.HTTPConnection(self.data.http_server, None, timeout=self.data.http_timeout)
         conn.request("POST", "/haldor/{0}".format(path), body, headers)
         print("Notifying {0}: ".format(path), end = '')
         return conn.getresponse()
