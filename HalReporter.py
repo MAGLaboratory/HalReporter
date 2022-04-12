@@ -4,6 +4,7 @@ import paho.mqtt.client as mqtt
 from daemon import Daemon
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
+from threading import Event
 from typing import *
 
 # store checkups to post as one block of checkups
@@ -128,21 +129,23 @@ class HR(mqtt.Client):
     def signal_handler(self, signum, frame):
         print("Caught a deadly signal!")
         self.running = False
+        self.evnt.set()
 
     def run(self):
+        self.evnt = Event() # our replacement for sleep
         if (self.data.checkup_freq < 10):
             print("Checkup period too low")
             sys.exit(1)
         self.checkup_wait = self.data.checkup_freq - 10
 
-        signal.signal(signal.SIGINT, self.signal_handler)
-        signal.signal(signal.SIGTERM, self.signal_handler)
+        for sig in ('TERM', 'HUP', 'INT'):
+            signal.signal(getattr(signal, 'SIG'+sig), self.signal_handler)
         self.running = True
 
         self.connect(self.data.mqtt_broker, self.data.mqtt_port, 60)
         self.loop_start()
         print("Waiting for other bootups...")
-        time.sleep(60)
+        self.evnt.wait(60)
         self.notify_bootup()
         
         while self.running:
@@ -151,7 +154,7 @@ class HR(mqtt.Client):
             self.publish("reporter/checkup_req")
             print("Notify Requested.")
             self.pings += 1
-            time.sleep(10)
+            self.evnt.wait(10)
             for checkup in self.checkups.values():
                 self.notify_checkup.update(checkup)
             self.notify_checkup["time"] = time.time()
@@ -166,6 +169,7 @@ class HR(mqtt.Client):
                     self.notify_checkup[check_name] = subprocess.check_output(self.data.boot_check_list[check_name], shell=True).decode('utf-8')
             resp = self.notify('checkup', self.notify_checkup)
             print ("Response: " + resp.read().decode('utf-8'))
-            time.sleep(self.checkup_wait)
+            self.evnt.wait(self.checkup_wait)
 
         self.loop_stop()
+        return 0
