@@ -10,4 +10,4 @@
 ### END INIT INFO
 # Haldor init script
 
-sudo -H -u reporter bash -c "/home/reporter/HalReporter/start.sh \"$@\""
+sudo -H -u reporter bash -c "/home/reporter/HalReporter/hal-reporter.sh \"$@\""
