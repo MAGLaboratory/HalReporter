@@ -108,7 +108,7 @@ class HR(mqtt.Client):
             "X-Checksum": self.notify_hash(body)
             }
     
-        conn = http.client.HTTPConnection(self.data.http_server, None, timeout=self.data.http_timeout)
+        conn = http.client.HTTPSConnection(self.data.http_server, None, timeout=self.data.http_timeout)
         conn.request("POST", "/haldor/{0}".format(path), body, headers)
         print("Notifying {0}: ".format(path), end = '')
         return conn.getresponse()
