@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from dataclasses_json import dataclass_json
 from threading import Event
 from typing import *
+import base64
 
 # store checkups to post as one block of checkups
 class HRDaemon(Daemon):
@@ -111,7 +112,17 @@ class HR(mqtt.Client):
         conn = http.client.HTTPSConnection(self.data.http_server, None, timeout=self.data.http_timeout)
         conn.request("POST", "/haldor/{0}".format(path), body, headers)
         print("Notifying {0}: ".format(path), end = '')
-        return conn.getresponse()
+        resp = conn.getresponse()
+        print(f"Headers: {resp.msg}")
+        print(f"Response: {resp.read().decode('ascii')}")
+        try:
+            base64.b64decode(resp.read())
+        except base64.binascii.Error:
+            if resp.read().decode('ascii').startswith("OK"):
+                pass
+            else:
+                raise
+        return resp.read()
     
     def notify_bootup(self):
         boot_checks = {}
@@ -123,7 +134,7 @@ class HR(mqtt.Client):
     
         boot_checks.update(self.other_bootup)
         resp = self.notify('bootup', boot_checks)
-        self.session = resp.read()
+        self.session = resp
         print("Bootup Complete: {0}".format(self.session.decode('utf-8')))
 
     def signal_handler(self, signum, frame):
@@ -168,7 +179,7 @@ class HR(mqtt.Client):
                         break
                     self.notify_checkup[check_name] = subprocess.check_output(self.data.boot_check_list[check_name], shell=True).decode('utf-8')
             resp = self.notify('checkup', self.notify_checkup)
-            print ("Response: " + resp.read().decode('utf-8'))
+            print ("Response: " + resp.decode('utf-8'))
             self.evnt.wait(self.checkup_wait)
 
         self.loop_stop()
