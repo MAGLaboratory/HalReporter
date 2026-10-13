@@ -114,15 +114,16 @@ class HR(mqtt.Client):
         print("Notifying {0}: ".format(path), end = '')
         resp = conn.getresponse()
         print(f"Headers: {resp.msg}")
-        print(f"Response: {resp.read().decode('ascii')}")
+        body = resp.read()
+        print(f"Body: {body}")
         try:
-            base64.b64decode(resp.read())
+            base64.b64decode(body)
         except base64.binascii.Error:
-            if resp.read().decode('ascii').startswith("OK"):
+            if body.decode('ascii').startswith("OK"):
                 pass
             else:
                 raise
-        return resp.read()
+        return body
     
     def notify_bootup(self):
         boot_checks = {}
